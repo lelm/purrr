@@ -17,3 +17,4 @@
 ^\.github$
 ^TAGS$
 ^\.httr-oauth$
+^\.vscode/
