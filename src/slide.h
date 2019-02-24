@@ -1,9 +1,8 @@
-#ifndef MAP_H
-#define MAP_H
+#ifndef SLIDE_H
+#define SLIDE_H
 
 extern "C" {
-  SEXP map_impl(SEXP env, SEXP x_name_, SEXP f_name_, SEXP type_);
-  SEXP pmap_impl(SEXP env, SEXP l_name_, SEXP f_name_, SEXP type_);
+  SEXP slide_impl(SEXP env, SEXP x_name_, SEXP f_name_, SEXP width_, SEXP align_, SEXP fill_, SEXP type_);
 }
 
 #endif
