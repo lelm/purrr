@@ -6,25 +6,6 @@
 #include "conditions.h"
 #include "utils.h"
 
-void copy_names(SEXP from, SEXP to) {
-  if (Rf_length(from) != Rf_length(to))
-    return;
-
-  SEXP names = Rf_getAttrib(from, R_NamesSymbol);
-  if (Rf_isNull(names))
-    return;
-
-  Rf_setAttrib(to, R_NamesSymbol, names);
-}
-
-void check_vector(SEXP x, const char *name) {
-  if (Rf_isNull(x) || Rf_isVector(x) || Rf_isPairList(x)) {
-    return;
-  }
-
-  stop_bad_type(x, "a vector", NULL, name);
-}
-
 // call must involve i
 SEXP call_loop(SEXP env, SEXP call, int n, SEXPTYPE type, int force_args) {
   // Create variable "i" and map to scalar integer

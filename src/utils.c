@@ -1,6 +1,7 @@
 #define R_NO_REMAP
 #include <Rinternals.h>
 #include <stdbool.h>
+#include "conditions.h"
 
 SEXP sym_protect(SEXP x) {
   if (TYPEOF(x) == LANGSXP || TYPEOF(x) == SYMSXP) {
@@ -63,4 +64,23 @@ SEXP lang8(SEXP s, SEXP t, SEXP u, SEXP v, SEXP w, SEXP x, SEXP y, SEXP z) {
   s = Rf_lcons(s, list7(t, u, v, w, x, y, z));
   UNPROTECT(1);
   return s;
+}
+
+void copy_names(SEXP from, SEXP to) {
+  if (Rf_length(from) != Rf_length(to))
+    return;
+
+  SEXP names = Rf_getAttrib(from, R_NamesSymbol);
+  if (Rf_isNull(names))
+    return;
+
+  Rf_setAttrib(to, R_NamesSymbol, names);
+}
+
+void check_vector(SEXP x, const char *name) {
+  if (Rf_isNull(x) || Rf_isVector(x) || Rf_isPairList(x)) {
+    return;
+  }
+
+  stop_bad_type(x, "a vector", NULL, name);
 }

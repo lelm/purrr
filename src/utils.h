@@ -15,5 +15,8 @@ bool is_vector(SEXP x);
 SEXP lang7(SEXP s, SEXP t, SEXP u, SEXP v, SEXP w, SEXP x, SEXP y);
 SEXP lang8(SEXP s, SEXP t, SEXP u, SEXP v, SEXP w, SEXP x, SEXP y, SEXP z);
 
+void check_vector(SEXP x, const char *name);
+void copy_names(SEXP from, SEXP to);
+
 
 #endif
