@@ -11,6 +11,7 @@ extern SEXP map_impl(SEXP, SEXP, SEXP, SEXP);
 extern SEXP map2_impl(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP pmap_impl(SEXP, SEXP, SEXP, SEXP);
 extern SEXP slide_impl(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP slide_impl_overwrite_window(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP transpose_impl(SEXP, SEXP);
 extern SEXP vflatten_impl(SEXP, SEXP);
 
@@ -24,6 +25,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"slide_impl",     (DL_FUNC) &slide_impl,     7},
     {"transpose_impl", (DL_FUNC) &transpose_impl, 2},
     {"vflatten_impl",  (DL_FUNC) &vflatten_impl,  2},
+    {"slide_impl_overwrite_window", (DL_FUNC) &slide_impl_overwrite_window, 7},
     {NULL, NULL, 0}
 };
 

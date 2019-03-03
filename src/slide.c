@@ -216,3 +216,126 @@ SEXP slide_impl(SEXP env, SEXP x_name_, SEXP f_name_, SEXP width_, SEXP align_, 
 
   return out;
 }
+
+// Alternative version of `slide_impl` that allocates a vector for the
+// rolling window only once and overwrites its values in each iteration.
+// - Allows to gauge the potential speed gain if we avoid allocating memory
+//   in each iteration.
+// - Leads to unexpected behaviour in (the unusual) case the vector `x_window'
+//   holding the sliding window is assigned during a call to .f, e.g.
+//   `slide(1:3, identity, 2)' or
+//   `a<-list(); slide_dbl(1:3, function(x){a<<-c(a, list(x)); sum(x)}, 2); a'
+// - Reference counting would allow to detect whether `x_window' is referenced
+//   after calling .f and allocate a new vector if this is the case. However,
+//   while proposed in 2014, reference counting for R is not implemented (yet).
+//   See notes on reference counting by Luke Tierney:
+//   https://developer.r-project.org/Refcnt.html.
+SEXP slide_impl_overwrite_window(SEXP env, SEXP x_name_, SEXP f_name_, SEXP width_, SEXP align_, SEXP fill_, SEXP type_) {
+  const char* x_name = CHAR(Rf_asChar(x_name_));
+  const char* f_name = CHAR(Rf_asChar(f_name_));
+
+  SEXP x = Rf_install(x_name);
+  SEXP f = Rf_install(f_name);
+  int width = Rf_asInteger(width_);
+  int align = Rf_asInteger(align_);
+  SEXPTYPE type = Rf_str2type(CHAR(Rf_asChar(type_)));
+  if (fill_ != R_NilValue && Rf_length(fill_) != 1)
+    Rf_error("`.fill' needs to be a vector of length one or NULL.");
+
+  SEXP x_val = Rf_eval(x, env);
+  check_vector(x_val, ".x");
+
+  int n = Rf_length(x_val);
+  if (n == 0) {
+    SEXP out = PROTECT(Rf_allocVector(type, 0));
+    if (fill_ != R_NilValue) {
+      copy_names(x_val, out);
+    }
+    UNPROTECT(1);
+    return out;
+  }
+  if (width < 1) {
+    Rf_error(".n must be a positive intger.");
+  }
+  if (width > n) {
+    SEXP out;
+    if (fill_ == R_NilValue) {
+      out = PROTECT(Rf_allocVector(type, 0));
+    } else {
+      out = PROTECT(Rf_allocVector(type, n));
+      fill_range(out, fill_, 0, n);
+      copy_names(x_val, out);
+    }
+    UNPROTECT(1);
+    return out;
+  }
+
+  // offset between start of sliding window and position in resulting vector
+  int offset;
+  if (fill_ == R_NilValue) {
+     offset = 0;
+  } else {
+    switch(align) {
+    case 1: offset = 0; break; // LEFT align
+    case 2:
+      // CENTER align
+      offset = width / 2;
+      if (width % 2 == 0)
+        Rf_warning(".align = 'center' with even numbered window size, aligning to the center left.");
+      break;
+    case 3: offset = width - 1; break; // RIGHT align
+    default: Rf_error("Illegal value for _align.");
+    }
+  }
+
+  // Construct a call f(x_window, ...) where x_window holds the portion of x in
+  // the sliding window. x_window will be populated with
+  // x[1:width], x[2:(width+1)], etc. while iterating over the resulting vector.
+  SEXP x_window = Rf_install("x_window");
+  SEXP x_window_val = PROTECT(Rf_allocVector(TYPEOF(x_val), width));
+  Rf_defineVar(x_window, x_window_val, env);
+  SEXP f_call = PROTECT(Rf_lang3(f, x_window, R_DotsSymbol));
+
+  int out_length = (fill_ == R_NilValue) ? (n - width + 1) : n;
+  SEXP out = PROTECT(Rf_allocVector(type, out_length));
+
+  if (fill_ != R_NilValue) {
+    // pad result to the left
+    fill_range(out, fill_, 0, offset);
+  }
+
+  for (int i = 0; i <= n - width; ++i) {
+    if (i % 1024 == 0)
+      R_CheckUserInterrupt();
+
+    // copy portion of x in the current position of the sliding window
+    copy_range(x_window_val, x_val, i, width);
+
+    // out[i + offset] <- f(x_window, ...)
+#if defined(R_VERSION) && R_VERSION >= R_Version(3, 2, 3)
+    SEXP res = PROTECT(R_forceAndCall(f_call, 1, env));
+#else
+    SEXP res = PROTECT(Rf_eval(f_call, env));
+#endif
+    if (type != VECSXP && Rf_length(res) != 1) {
+      SEXP ptype = PROTECT(Rf_allocVector(type, 0));
+      stop_bad_element_vector(res, i + 1, ptype, 1, "Result", NULL, false);
+    }
+    set_vector_value(out, i + offset, res, 0);
+    UNPROTECT(1);
+
+    // If R would support reference counting, we could check if `x_window_val'
+    // is referenced by another object and allocate a new vector if
+    // `x_window_val' is referenced.
+  }
+
+  if (fill_ != R_NilValue) {
+    // pad result to the right
+    fill_range(out, fill_, n - width + 1 + offset, n);
+    copy_names(x_val, out);
+  }
+
+  UNPROTECT(3);
+
+  return out;
+}
